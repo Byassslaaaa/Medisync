@@ -38,9 +38,20 @@ temp/
 # ─── Office temp lock files (buka file .docx/.pptx) ──────────────
 ~$*
 
-# ─── File internal audit / tooling (tidak relevan untuk repo) ─────
+# ─── File dokumentasi lokal (tidak masuk repo) ────────────────────
 AUDIT_KESESUAIAN_TUGAS_FINAL.md
 PROMPT_GITHUB_PUBLISH.md
+LAPORAN_MEDISYNC.md
+LAPORAN_MEDISYNC.docx
+MediSync-Diagram.drawio
+MediSync-Diagram-BW.drawio
+MediSync-Presentasi.pptx
+MediSync-Presentasi-NEW.pptx
+PROMPT_VIBECODE_IMPLEMENTASI.md
+PROMPT_VIBECODE_LAPORAN_WORD.md
+generate_docs.py
+generate_pptx.py
+*.pdf
 
 # ─── Docker local volumes ─────────────────────────────────────────
 **/.docker/
