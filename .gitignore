@@ -51,7 +51,9 @@ PROMPT_VIBECODE_IMPLEMENTASI.md
 PROMPT_VIBECODE_LAPORAN_WORD.md
 generate_docs.py
 generate_pptx.py
+generate_penjelasan.py
 *.pdf
+PENJELASAN_MEDISYNC.docx
 
 # ─── Docker local volumes ─────────────────────────────────────────
 **/.docker/

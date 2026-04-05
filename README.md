@@ -4,6 +4,7 @@
 >
 > Studi kasus: Sistem Informasi Rumah Sakit berbasis arsitektur **Microservices**
 > dengan komunikasi **gRPC (sinkron)** dan **RabbitMQ (asinkron)**.
+> Database dipisah **secara fisik** — dua instance PostgreSQL berbeda.
 
 ---
 
@@ -20,47 +21,73 @@
 ## Arsitektur Sistem
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  Docker Network: medisync-net                │
-│                                                             │
-│  ┌──────────────┐  HTTP/REST  ┌──────────────────────────┐ │
-│  │   Frontend   │────────────►│       Service A          │ │
-│  │ React + Vite │  POST /api  │  Pendaftaran | Port 4001 │ │
-│  │  Port: 3000  │             └──────────┬───────────────┘ │
-│  └──────────────┘                        │                  │
-│                              ┌───────────┤                  │
-│                         gRPC │     MQ    │                  │
-│                        (sync)│   (async) │                  │
-│                              ▼           ▼                  │
-│                   ┌──────────────┐  ┌──────────┐           │
-│                   │  Service B   │◄─┤ RabbitMQ │           │
-│                   │  Rekam Medis │  │ :5672    │           │
-│                   │  :4002/50052 │  │ UI:15672 │           │
-│                   └──────┬───────┘  └──────────┘           │
-│                          │                                   │
-│          ┌───────────────┴──────────────────┐               │
-│          │         PostgreSQL :5432          │               │
-│          │  ┌──────────────┐ ┌────────────┐ │               │
-│          │  │db_pendaftaran│ │db_rekam_   │ │               │
-│          │  │ (Service A)  │ │medis (B)   │ │               │
-│          │  └──────────────┘ └────────────┘ │               │
-│          └──────────────────────────────────┘               │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                     Docker Network: medisync-net                     │
+│                                                                      │
+│  ┌──────────────┐  HTTP/REST  ┌──────────────────────────────────┐  │
+│  │   Frontend   │────────────►│           Service A              │  │
+│  │ React + Vite │  POST /api  │  Pendaftaran | Port 4001         │  │
+│  │  Port: 3000  │             └──────────┬───────────────────────┘  │
+│  └──────────────┘                        │                           │
+│                              ┌───────────┤                           │
+│                         gRPC │     MQ    │                           │
+│                        (sync)│  (async)  │                           │
+│                              ▼           ▼                           │
+│                   ┌──────────────────┐  ┌──────────┐                │
+│                   │    Service B     │◄─┤ RabbitMQ │                │
+│                   │  Rekam Medis     │  │  :5672   │                │
+│                   │  :4002 / :50052  │  │ UI:15672 │                │
+│                   └──────────────────┘  └──────────┘                │
+│                          │                                           │
+│          ┌───────────────┴──────────────────────────┐               │
+│          │                                          │               │
+│   ┌──────▼──────────────────┐  ┌───────────────────▼─────────┐     │
+│   │      postgres-a         │  │         postgres-b           │     │
+│   │  db_pendaftaran         │  │     db_rekam_medis           │     │
+│   │  host port: 5433        │  │     host port: 5434          │     │
+│   │  ← Service A ONLY →     │  │     ← Service B ONLY →      │     │
+│   └─────────────────────────┘  └─────────────────────────────┘     │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Tech Stack
 
-| Komponen | Teknologi | Port |
-|----------|-----------|------|
-| Frontend | React 18 + Vite + Axios | 3000 |
-| Service A | Go 1.21 + Gin + gRPC Client | 4001 |
-| Service B | Go 1.21 + Gin + gRPC Server | 4002 / 50052 |
-| Database A | PostgreSQL 15 — `db_pendaftaran` | 5432 |
-| Database B | PostgreSQL 15 — `db_rekam_medis` | 5432 |
-| Message Broker | RabbitMQ 3.12 | 5672 / 15672 |
-| Deployment | Docker Compose | — |
+| Komponen | Teknologi | Port (Host) | Port (Container) |
+|----------|-----------|-------------|-----------------|
+| Frontend | React 18 + Vite + Axios | 3000 | 80 |
+| Service A | Go 1.21 + Gin + gRPC Client | 4001 | 4001 |
+| Service B | Go 1.21 + Gin + gRPC Server | 4002 / 50052 | 4002 / 50052 |
+| **postgres-a** | **PostgreSQL 15 — `db_pendaftaran`** | **5433** | **5432** |
+| **postgres-b** | **PostgreSQL 15 — `db_rekam_medis`** | **5434** | **5432** |
+| Message Broker | RabbitMQ 3.12 | 5672 / 15672 | 5672 / 15672 |
+| Deployment | Docker Compose | — | — |
+
+---
+
+## Database Isolation (Physical Separation)
+
+MediSync menggunakan **dua instance PostgreSQL terpisah** — bukan satu server dengan dua database.
+
+| | postgres-a | postgres-b |
+|---|---|---|
+| **Container** | `medisync-postgres-a` | `medisync-postgres-b` |
+| **Database** | `db_pendaftaran` | `db_rekam_medis` |
+| **Volume** | `pgdata-a` | `pgdata-b` |
+| **Init script** | `init-db-a.sql` | `init-db-b.sql` |
+| **Host port** | `5433` | `5434` |
+| **Dapat diakses oleh** | Service A **saja** | Service B **saja** |
+
+### Checklist Verifikasi Isolasi
+
+- [ ] `service-a` hanya punya env `DB_URL` yang mengarah ke `postgres-a:5432`
+- [ ] `service-b` hanya punya env `DB_URL` yang mengarah ke `postgres-b:5432`
+- [ ] Tidak ada query cross-DB di seluruh codebase
+- [ ] `depends_on` service-a hanya menyebut `postgres-a`, service-b hanya menyebut `postgres-b`
+- [ ] Volume `pgdata-a` dan `pgdata-b` berdiri sendiri — satu volume tidak bisa dibaca instance lain
+
+Jalankan `make verify-isolation` setelah sistem up untuk membuktikan pemisahan fisik.
 
 ---
 
@@ -74,29 +101,27 @@ MediSync/
 ├── service-a/                      ← Service Pendaftaran
 │   ├── cmd/main.go
 │   ├── internal/
-│   │   ├── db/postgres.go          ← Koneksi db_pendaftaran
+│   │   ├── db/postgres.go          ← Koneksi ke postgres-a / db_pendaftaran
 │   │   ├── grpc/
 │   │   │   ├── client.go           ← gRPC client ke Service B
 │   │   │   └── codec.go            ← JSON codec workaround untuk .pb.go manual
 │   │   ├── handler/patient.go      ← POST /api/patients, GET /api/patients
 │   │   ├── mq/producer.go          ← Publish event patient.registered
 │   │   └── proto/                  ← Generated stubs dari medical_record.proto
-│   ├── go.mod
-│   ├── go.sum
+│   ├── go.mod / go.sum
 │   └── Dockerfile
 │
 ├── service-b/                      ← Service Rekam Medis
 │   ├── cmd/main.go
 │   ├── internal/
-│   │   ├── db/postgres.go          ← Koneksi db_rekam_medis
+│   │   ├── db/postgres.go          ← Koneksi ke postgres-b / db_rekam_medis
 │   │   ├── grpc/
 │   │   │   ├── server.go           ← gRPC server: CheckPatientRecord
 │   │   │   └── codec.go            ← JSON codec workaround untuk .pb.go manual
 │   │   ├── handler/record.go       ← GET /api/records, GET /api/records/:nik
 │   │   ├── mq/consumer.go          ← Consume event, buat draft rekam medis
 │   │   └── proto/                  ← Generated stubs dari medical_record.proto
-│   ├── go.mod
-│   ├── go.sum
+│   ├── go.mod / go.sum
 │   └── Dockerfile
 │
 ├── frontend/                       ← UI React
@@ -105,22 +130,14 @@ MediSync/
 │   │   └── components/
 │   │       ├── PatientForm.jsx     ← Form pendaftaran pasien
 │   │       └── PatientList.jsx     ← Tabel daftar pasien
-│   ├── package.json
-│   ├── package-lock.json
+│   ├── package.json / package-lock.json
 │   └── Dockerfile
 │
-├── docker-compose.yml              ← Orkestrasi 5 container
-├── init-db.sql                     ← Inisialisasi db_pendaftaran + db_rekam_medis
-│
-├── MediSync-Diagram.drawio         ← Diagram arsitektur (berwarna)
-├── MediSync-Diagram-BW.drawio      ← Diagram arsitektur (hitam-putih, untuk laporan)
-├── LAPORAN_MEDISYNC.md             ← Laporan lengkap dalam Markdown
-├── LAPORAN_MEDISYNC.docx           ← Laporan dalam format Word
-├── MediSync-Presentasi-NEW.pptx    ← Slide presentasi 12 halaman
-│
-├── generate_docs.py                ← Script generator laporan+PPT (bukti AI usage)
-├── PROMPT_VIBECODE_IMPLEMENTASI.md ← Prompt AI untuk implementasi (bukti AI usage)
-└── PROMPT_VIBECODE_LAPORAN_WORD.md ← Prompt AI untuk laporan (bukti AI usage)
+├── docker-compose.yml              ← Orkestrasi 6 container (termasuk 2 postgres)
+├── init-db-a.sql                   ← Init pgcrypto untuk postgres-a
+├── init-db-b.sql                   ← Init pgcrypto untuk postgres-b
+├── Makefile                        ← Shortcut perintah + verify-isolation
+└── README.md
 ```
 
 ---
@@ -128,12 +145,18 @@ MediSync/
 ## Cara Menjalankan (dengan Makefile)
 
 ```bash
-make run       # build dan jalankan semua service
-make down      # hentikan semua container
-make reset     # reset data + jalankan ulang
-make logs      # lihat log semua service
-make proto     # regenerate .pb.go dari proto/medical_record.proto
-make help      # lihat semua perintah
+make run              # build dan jalankan semua service (foreground)
+make run-bg           # build dan jalankan semua service (background)
+make down             # hentikan semua container
+make reset            # reset data + jalankan ulang
+make logs             # lihat log semua service
+make logs-a           # log Service A
+make logs-b           # log Service B
+make logs-db-a        # log postgres-a
+make logs-db-b        # log postgres-b
+make verify-isolation # verifikasi pemisahan fisik database
+make proto            # regenerate .pb.go dari proto/medical_record.proto
+make help             # lihat semua perintah
 ```
 
 ## Cara Menjalankan (tanpa Make)
@@ -141,7 +164,10 @@ make help      # lihat semua perintah
 ### Prasyarat
 
 - Docker Desktop terinstall dan berjalan
-- Port berikut tidak dipakai: `3000`, `4001`, `4002`, `50052`, `5432`, `5672`, `15672`
+- Port berikut tidak dipakai: `3000`, `4001`, `4002`, `50052`, `5433`, `5434`, `5672`, `15672`
+
+> **Catatan Port Database**: postgres-a di-expose ke host port `5433`, postgres-b ke port `5434`.
+> Ini untuk menghindari konflik dengan instalasi PostgreSQL lokal yang biasanya ada di port `5432`.
 
 ### Jalankan
 
@@ -177,7 +203,7 @@ Tunggu hingga log menampilkan:
 ### Reset Data
 
 ```bash
-docker compose down -v   # hapus semua container + volume
+docker compose down -v   # hapus semua container + kedua volume
 docker compose up --build
 ```
 
@@ -222,15 +248,15 @@ curl -X POST http://localhost:4001/api/patients \
         ↓ HTTP POST /api/patients
 2. Service A validasi input
         ↓ gRPC CheckPatientRecord(nik) — SYNCHRONOUS — Service A menunggu
-3. Service B query db_rekam_medis → return has_record true/false
+3. Service B query db_rekam_medis di postgres-b → return has_record true/false
         ↓ Jika sudah ada: HTTP 409 Conflict (tolak)
         ↓ Jika belum ada:
-4. Service A INSERT ke db_pendaftaran
-        ↓ gRPC berhasil → simpan lokal selesai
+4. Service A INSERT ke db_pendaftaran di postgres-a
+        ↓ simpan lokal selesai
 5. Service A publish event "patient.registered" ke RabbitMQ — ASYNCHRONOUS
         ↓ Service A langsung return HTTP 201 ke Frontend (tidak menunggu B)
 6. Service B consume event dari queue "patient.queue"
-        ↓ INSERT draft rekam medis ke db_rekam_medis
+        ↓ INSERT draft rekam medis ke db_rekam_medis di postgres-b
 7. Draft rekam medis tersedia di GET /api/records/:nik
 ```
 
@@ -241,11 +267,11 @@ curl -X POST http://localhost:4001/api/patients \
 | Requirement | Status | Bukti |
 |-------------|--------|-------|
 | Frontend input data pasien | ✅ PASS | `frontend/src/components/PatientForm.jsx` |
-| Service A + database sendiri | ✅ PASS | `service-a/internal/db/postgres.go` → `db_pendaftaran` |
-| Service B + database sendiri | ✅ PASS | `service-b/internal/db/postgres.go` → `db_rekam_medis` |
+| Service A + database sendiri | ✅ PASS | `service-a` → `postgres-a` / `db_pendaftaran` |
+| Service B + database sendiri | ✅ PASS | `service-b` → `postgres-b` / `db_rekam_medis` |
 | gRPC Synchronous | ✅ PASS | `service-a/internal/grpc/client.go` + `service-b/internal/grpc/server.go` |
 | RabbitMQ Asynchronous | ✅ PASS | `service-a/internal/mq/producer.go` + `service-b/internal/mq/consumer.go` |
-| Database Isolation | ✅ PASS | Zero cross-DB query di seluruh codebase |
+| **Database Isolation Fisik** | ✅ **PASS** | **Dua container PostgreSQL terpisah: `postgres-a` & `postgres-b`** |
 | Contract-First (.proto) | ✅ PASS | `proto/medical_record.proto` sebagai single source of truth |
 | Bisa dijalankan lokal | ✅ PASS | `docker compose up --build` |
 
@@ -253,36 +279,37 @@ curl -X POST http://localhost:4001/api/patients \
 
 ## Catatan Teknis
 
+### Pemisahan Database Fisik
+
+Arsitektur lama menggunakan **satu instance PostgreSQL** dengan dua database (`db_pendaftaran` dan `db_rekam_medis`) di dalamnya. Secara logis terpisah, tetapi secara fisik masih satu server.
+
+Arsitektur baru menggunakan **dua container PostgreSQL terpisah**:
+- `postgres-a` hanya berisi `db_pendaftaran` — dikontrol eksklusif oleh Service A
+- `postgres-b` hanya berisi `db_rekam_medis` — dikontrol eksklusif oleh Service B
+
+Implikasi nyata:
+- Dua proses `postgres` berjalan secara independen di container berbeda
+- Dua volume Docker berbeda (`pgdata-a`, `pgdata-b`) — tidak ada shared storage
+- Jika salah satu postgres container down, service pasangannya down, service lain tetap jalan
+- Credential, konfigurasi, dan lifecycle masing-masing DB bisa dikelola secara independen
+
 ### Contract-First & Regenerasi Proto
 
 Kontrak gRPC didefinisikan di `proto/medical_record.proto` sebagai **single source of truth**.
-File stub `.pb.go` yang ada di `service-a/internal/proto/` dan `service-b/internal/proto/` ditulis secara manual untuk keperluan tugas ini.
 
-Untuk regenerasi menggunakan `protoc` (cara yang benar di proyek nyata):
+Untuk regenerasi menggunakan `protoc`:
 ```bash
-# Install protoc tools dulu:
-# https://grpc.io/docs/languages/go/quickstart/
-
 make proto
-# atau manual:
-protoc \
-  --go_out=service-a/internal/proto --go_opt=paths=source_relative \
-  --go-grpc_out=service-a/internal/proto --go-grpc_opt=paths=source_relative \
-  --proto_path=proto proto/medical_record.proto
 ```
 
 ### Kenapa ada `codec.go` di `internal/grpc/`?
 
-File `.pb.go` manual tidak mengimplementasikan protobuf binary descriptor secara lengkap (`ProtoReflect()` tidak menghasilkan descriptor bytes). Tanpa descriptor, gRPC tidak bisa melakukan serialisasi biner dan akan crash dengan error `nil message`.
-
-`codec.go` menyelesaikan ini dengan mendaftarkan **JSON codec** sebagai pengganti codec `"proto"` default gRPC:
+File `.pb.go` manual tidak mengimplementasikan protobuf binary descriptor secara lengkap (`ProtoReflect()` tidak menghasilkan descriptor bytes). `codec.go` menyelesaikan ini dengan mendaftarkan **JSON codec** sebagai pengganti codec `"proto"` default gRPC:
 
 ```
 Tanpa codec.go:  gRPC → proto.Marshal(msg) → ProtoReflect() → nil → CRASH
 Dengan codec.go: gRPC → json.Marshal(msg)  → {"nik":"..."} → OK ✓
 ```
-
-Kontrak tetap didefinisikan di `proto/medical_record.proto`. Service name, method name, dan field names tetap persis sama — hanya format wire yang berubah dari biner ke JSON. Ini **tidak mengubah semantik gRPC**, hanya mengubah transport encoding.
 
 ### Ketahanan MQ (Reconnect Otomatis)
 
@@ -295,10 +322,11 @@ Kontrak tetap didefinisikan di `proto/medical_record.proto`. Service name, metho
 
 | Masalah | Solusi |
 |---------|--------|
-| Container gagal start | Pastikan Docker Desktop running, cek port tidak bentrok |
-| Service A return 503 | Pastikan service-b dan RabbitMQ sudah fully ready (tunggu ~30 detik) |
+| Container gagal start | Pastikan Docker Desktop running, cek port 5433/5434/5672 tidak bentrok |
+| Service A return 503 | Pastikan service-b, postgres-a, dan RabbitMQ sudah fully ready (tunggu ~30 detik) |
 | Data tidak muncul di Service B | Tunggu consumer MQ memproses (~2-3 detik setelah pendaftaran) |
 | Reset data | `docker compose down -v && docker compose up --build` |
+| Verifikasi isolasi DB | `make verify-isolation` |
 
 ---
 

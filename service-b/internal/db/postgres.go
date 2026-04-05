@@ -16,7 +16,7 @@ var DB *sql.DB
 func Connect() {
 	dsn := os.Getenv("DB_URL")
 	if dsn == "" {
-		dsn = "postgres://admin:secret123@localhost:5432/db_rekam_medis?sslmode=disable"
+		dsn = "postgres://admin:secret123@localhost:5434/db_rekam_medis?sslmode=disable"
 	}
 
 	var lastErr error
