@@ -1,0 +1,46 @@
+# ─── OS & editor ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ─── Claude Code session (tool-only, bukan kode) ──────────────────
+.claude/
+
+# ─── Python virtual environment (generate_docs.py helper) ─────────
+.venv/
+
+# ─── Node.js / Frontend ───────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+yarn-error.log*
+
+# ─── Go build artifacts ────────────────────────────────────────────
+service-a/bin/
+service-b/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# ─── Logs & temp ──────────────────────────────────────────────────
+*.log
+tmp/
+temp/
+
+# ─── Environment / secrets ────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Office temp lock files (buka file .docx/.pptx) ──────────────
+~$*
+
+# ─── File internal audit / tooling (tidak relevan untuk repo) ─────
+AUDIT_KESESUAIAN_TUGAS_FINAL.md
+PROMPT_GITHUB_PUBLISH.md
+
+# ─── Docker local volumes ─────────────────────────────────────────
+**/.docker/

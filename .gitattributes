@@ -1,0 +1,10 @@
+# Normalisasi line endings: semua teks pakai LF di repo
+* text=auto eol=lf
+
+# Binary — jangan diubah
+*.png binary
+*.jpg binary
+*.docx binary
+*.pptx binary
+*.pdf binary
+*.drawio text eol=lf

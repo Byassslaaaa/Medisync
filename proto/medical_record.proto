@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package medicalrecord;
+
+option go_package = "./proto";
+
+// MedicalRecordService mendefinisikan kontrak gRPC antara Service A dan Service B.
+// Service A bertindak sebagai Client, Service B sebagai Server.
+service MedicalRecordService {
+  // CheckPatientRecord: cek apakah pasien sudah memiliki rekam medis di Service B
+  // Dipanggil secara SYNCHRONOUS oleh Service A sebelum mendaftarkan pasien
+  rpc CheckPatientRecord (PatientRequest) returns (RecordResponse);
+}
+
+message PatientRequest {
+  string nik = 1;
+}
+
+message RecordResponse {
+  bool   has_record = 1;
+  string record_id  = 2;
+  string message    = 3;
+}
