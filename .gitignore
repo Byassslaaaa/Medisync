@@ -54,6 +54,16 @@ generate_pptx.py
 generate_penjelasan.py
 *.pdf
 PENJELASAN_MEDISYNC.docx
+DEPLOYMENT.md
+DEPLOYMENT.docx
+DEPLOYMENT_GUIDE.docx
+DEPLOYMENT_GUIDE.html
+DEPLOYMENT_GUIDE_presentasi.docx
+DEPLOYMENT_GUIDE_presentasi.html
+PROMPT_ADD_MEDICAL_RECORDS.md
+PROMPT_ADD_MEDICAL_RECORDS.docx
+CONVERT_TO_WORD_GUIDE.md
+RINGKASAN_DEPLOYMENT_LENGKAP.md
 
 # ─── Docker local volumes ─────────────────────────────────────────
 **/.docker/

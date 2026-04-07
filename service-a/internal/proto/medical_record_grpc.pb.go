@@ -13,6 +13,7 @@ import (
 // MedicalRecordServiceClient adalah interface untuk gRPC client (digunakan oleh Service A)
 type MedicalRecordServiceClient interface {
 	CheckPatientRecord(ctx context.Context, in *PatientRequest, opts ...grpc.CallOption) (*RecordResponse, error)
+	GetAllRecords(ctx context.Context, in *GetRecordsRequest, opts ...grpc.CallOption) (*RecordsListResponse, error)
 }
 
 type medicalRecordServiceClient struct {
@@ -26,6 +27,15 @@ func NewMedicalRecordServiceClient(cc grpc.ClientConnInterface) MedicalRecordSer
 func (c *medicalRecordServiceClient) CheckPatientRecord(ctx context.Context, in *PatientRequest, opts ...grpc.CallOption) (*RecordResponse, error) {
 	out := new(RecordResponse)
 	err := c.cc.Invoke(ctx, "/medicalrecord.MedicalRecordService/CheckPatientRecord", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *medicalRecordServiceClient) GetAllRecords(ctx context.Context, in *GetRecordsRequest, opts ...grpc.CallOption) (*RecordsListResponse, error) {
+	out := new(RecordsListResponse)
+	err := c.cc.Invoke(ctx, "/medicalrecord.MedicalRecordService/GetAllRecords", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}

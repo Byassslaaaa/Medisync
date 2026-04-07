@@ -148,3 +148,21 @@ func GetAllPatients(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": patients})
 }
+
+// GetMedicalRecords menangani GET /api/medical-records
+// Service A meneruskan request ke Service B via gRPC (SYNCHRONOUS).
+func GetMedicalRecords(c *gin.Context) {
+	log.Println("[Service-A][Handler] → Meneruskan GetMedicalRecords ke Service B via gRPC")
+
+	records, err := grpcclient.GetAllRecords()
+	if err != nil {
+		log.Printf("[Service-A][Handler] ✗ gRPC GetAllRecords error: %v", err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"message": "Service rekam medis tidak tersedia.",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": records})
+}

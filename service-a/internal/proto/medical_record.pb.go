@@ -71,5 +71,57 @@ func (x *RecordResponse) GetMessage() string {
 	return ""
 }
 
+// GetRecordsRequest adalah request untuk mengambil semua rekam medis.
+type GetRecordsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *GetRecordsRequest) Reset()         { *x = GetRecordsRequest{} }
+func (x *GetRecordsRequest) String() string { return protoimpl.X.MessageStringOf(x) }
+func (x *GetRecordsRequest) ProtoMessage()  {}
+func (x *GetRecordsRequest) ProtoReflect() protoreflect.Message { return nil }
+
+// MedicalRecordItem adalah satu item rekam medis dalam list response.
+type MedicalRecordItem struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PatientId     string `protobuf:"bytes,2,opt,name=patient_id,json=patientId,proto3" json:"patient_id,omitempty"`
+	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Nik           string `protobuf:"bytes,4,opt,name=nik,proto3" json:"nik,omitempty"`
+	Diagnosis     string `protobuf:"bytes,5,opt,name=diagnosis,proto3" json:"diagnosis,omitempty"`
+	Notes         string `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`
+	CreatedAt     string `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+}
+
+func (x *MedicalRecordItem) Reset()         { *x = MedicalRecordItem{} }
+func (x *MedicalRecordItem) String() string { return protoimpl.X.MessageStringOf(x) }
+func (x *MedicalRecordItem) ProtoMessage()  {}
+func (x *MedicalRecordItem) ProtoReflect() protoreflect.Message { return nil }
+
+// RecordsListResponse adalah response berisi list rekam medis.
+type RecordsListResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+	Records       []*MedicalRecordItem `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+}
+
+func (x *RecordsListResponse) Reset()         { *x = RecordsListResponse{} }
+func (x *RecordsListResponse) String() string { return protoimpl.X.MessageStringOf(x) }
+func (x *RecordsListResponse) ProtoMessage()  {}
+func (x *RecordsListResponse) ProtoReflect() protoreflect.Message { return nil }
+
+func (x *RecordsListResponse) GetRecords() []*MedicalRecordItem {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
 var _ = sync.Once{}
 var _ = reflect.TypeOf

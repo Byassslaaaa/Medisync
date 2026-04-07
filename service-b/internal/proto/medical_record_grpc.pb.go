@@ -33,6 +33,7 @@ func (c *medicalRecordServiceClient) CheckPatientRecord(ctx context.Context, in 
 
 type MedicalRecordServiceServer interface {
 	CheckPatientRecord(context.Context, *PatientRequest) (*RecordResponse, error)
+	GetAllRecords(context.Context, *GetRecordsRequest) (*RecordsListResponse, error)
 	mustEmbedUnimplementedMedicalRecordServiceServer()
 }
 
@@ -40,6 +41,10 @@ type UnimplementedMedicalRecordServiceServer struct{}
 
 func (UnimplementedMedicalRecordServiceServer) CheckPatientRecord(context.Context, *PatientRequest) (*RecordResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckPatientRecord not implemented")
+}
+
+func (UnimplementedMedicalRecordServiceServer) GetAllRecords(context.Context, *GetRecordsRequest) (*RecordsListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllRecords not implemented")
 }
 
 func (UnimplementedMedicalRecordServiceServer) mustEmbedUnimplementedMedicalRecordServiceServer() {}
@@ -70,6 +75,24 @@ func _MedicalRecordService_CheckPatientRecord_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MedicalRecordService_GetAllRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRecordsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MedicalRecordServiceServer).GetAllRecords(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/medicalrecord.MedicalRecordService/GetAllRecords",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MedicalRecordServiceServer).GetAllRecords(ctx, req.(*GetRecordsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var MedicalRecordService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "medicalrecord.MedicalRecordService",
 	HandlerType: (*MedicalRecordServiceServer)(nil),
@@ -77,6 +100,10 @@ var MedicalRecordService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckPatientRecord",
 			Handler:    _MedicalRecordService_CheckPatientRecord_Handler,
+		},
+		{
+			MethodName: "GetAllRecords",
+			Handler:    _MedicalRecordService_GetAllRecords_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

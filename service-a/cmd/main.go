@@ -48,6 +48,7 @@ func main() {
 	{
 		api.POST("/patients", handler.RegisterPatient)
 		api.GET("/patients", handler.GetAllPatients)
+		api.GET("/medical-records", handler.GetMedicalRecords)
 	}
 
 	port := os.Getenv("PORT")

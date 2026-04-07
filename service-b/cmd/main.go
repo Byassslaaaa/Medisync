@@ -22,11 +22,9 @@ func main() {
 	db.Connect()
 
 	// 2. Jalankan gRPC server di goroutine terpisah
-	// Goroutine memungkinkan gRPC server dan HTTP server berjalan bersamaan
 	go grpcserver.Start()
 
 	// 3. Jalankan RabbitMQ consumer di goroutine terpisah
-	// Consumer mendengarkan event secara terus-menerus tanpa memblok server
 	go mq.Start()
 
 	// 4. Setup HTTP server

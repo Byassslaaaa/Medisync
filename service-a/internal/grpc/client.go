@@ -41,6 +41,24 @@ func Connect() {
 	log.Printf("[Service-A][gRPC] Koneksi ke Service B (%s) berhasil.", target)
 }
 
+// GetAllRecords memanggil Service B via gRPC untuk mengambil semua rekam medis.
+// Ini adalah komunikasi SYNCHRONOUS — digunakan saat frontend request daftar rekam medis.
+func GetAllRecords() ([]*pb.MedicalRecordItem, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	log.Println("[Service-A][gRPC] → Memanggil GetAllRecords ke Service B")
+
+	resp, err := client.GetAllRecords(ctx, &pb.GetRecordsRequest{})
+	if err != nil {
+		log.Printf("[Service-A][gRPC] ✗ Error GetAllRecords dari Service B: %v", err)
+		return nil, err
+	}
+
+	log.Printf("[Service-A][gRPC] ← Menerima %d rekam medis dari Service B", len(resp.GetRecords()))
+	return resp.GetRecords(), nil
+}
+
 // CheckPatientRecord memanggil Service B via gRPC untuk cek apakah pasien sudah punya rekam medis.
 // Ini adalah komunikasi SYNCHRONOUS — Service A menunggu respons sebelum lanjut.
 func CheckPatientRecord(nik string) (bool, string, error) {

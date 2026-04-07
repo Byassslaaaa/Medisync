@@ -1,0 +1,416 @@
+version: "3.9"
+
+# Production-Ready Docker Compose Configuration
+# Features:
+#   ✓ Health checks for all services
+#   ✓ Resource limits and reservations
+#   ✓ Proper restart policies
+#   ✓ Security best practices
+#   ✓ Volume management
+#   ✓ Logging configuration
+#   ✓ Network isolation
+
+networks:
+  medisync-net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-medisync
+
+volumes:
+  pgdata-a:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/medisync/pgdata-a
+  
+  pgdata-b:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/medisync/pgdata-b
+  
+  rabbitmq-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/medisync/rabbitmq-data
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # postgres-a — Database eksklusif Service A (Pendaftaran)
+  # ─────────────────────────────────────────────────────────────
+  postgres-a:
+    image: postgres:15-alpine
+    container_name: medisync-postgres-a
+    restart: unless-stopped
+    
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: db_pendaftaran
+      POSTGRES_INITDB_ARGS: "-c max_connections=50 -c shared_buffers=256MB"
+    
+    volumes:
+      - pgdata-a:/var/lib/postgresql/data
+      - ./init-db-a.sql:/docker-entrypoint-initdb.d/init-db-a.sql
+    
+    ports:
+      - "127.0.0.1:5435:5432"  # ⚠️ Only accessible from localhost
+    
+    networks:
+      - medisync-net
+    
+    healthcheck:
+      test: 
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER} -d db_pendaftaran
+      interval: 5s
+      timeout: 5s
+      retries: 10      # More aggressive health checking
+      start_period: 20s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    labels:
+      com.medisync.service: "database"
+      com.medisync.env: "production"
+
+  # ─────────────────────────────────────────────────────────────
+  # postgres-b — Database eksklusif Service B (Rekam Medis)
+  # ─────────────────────────────────────────────────────────────
+  postgres-b:
+    image: postgres:15-alpine
+    container_name: medisync-postgres-b
+    restart: unless-stopped
+    
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: db_rekam_medis
+      POSTGRES_INITDB_ARGS: "-c max_connections=50 -c shared_buffers=256MB"
+    
+    volumes:
+      - pgdata-b:/var/lib/postgresql/data
+      - ./init-db-b.sql:/docker-entrypoint-initdb.d/init-db-b.sql
+    
+    ports:
+      - "127.0.0.1:5436:5432"  # ⚠️ Only accessible from localhost
+    
+    networks:
+      - medisync-net
+    
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER} -d db_rekam_medis
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    labels:
+      com.medisync.service: "database"
+      com.medisync.env: "production"
+
+  # ─────────────────────────────────────────────────────────────
+  # RabbitMQ — Message Broker (Async Communication)
+  # ─────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: medisync-rabbitmq
+    restart: unless-stopped
+    
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_ERLANG_COOKIE: medisync-secret-cookie-${ENVIRONMENT}
+    
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    
+    ports:
+      - "0.0.0.0:5673:5672"      # AMQP port (external - services dapat connect)
+      - "127.0.0.1:15673:15672"  # Management UI (only internal - jangan expose ke public)
+    
+    networks:
+      - medisync-net
+    
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    labels:
+      com.medisync.service: "message-broker"
+      com.medisync.env: "production"
+
+  # ─────────────────────────────────────────────────────────────
+  # Service B — Rekam Medis (Medical Records)
+  # Hanya connect ke postgres-b dan rabbitmq
+  # ─────────────────────────────────────────────────────────────
+  service-b:
+    build:
+      context: ./service-b
+      dockerfile: Dockerfile
+      args:
+        BUILD_ENV: production
+    
+    image: medisync-service-b:latest
+    container_name: medisync-service-b
+    restart: unless-stopped
+    
+    environment:
+      PORT: "4002"
+      GRPC_PORT: "50052"
+      ENV: production
+      LOG_LEVEL: info
+      DB_HOST: postgres-b
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: db_rekam_medis
+      DB_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-b:5432/db_rekam_medis?sslmode=disable"
+      RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/"
+    
+    ports:
+      - "0.0.0.0:8004:4002"    # REST API (external)
+      - "0.0.0.0:50052:50052"  # gRPC port (external for Service-A)
+    
+    depends_on:
+      postgres-b:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    
+    networks:
+      - medisync-net
+    
+    healthcheck:
+      test: 
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://localhost:4002/health
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        labels: "medisync.service=service-b"
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    labels:
+      com.medisync.service: "service-b"
+      com.medisync.component: "medical-records"
+      com.medisync.env: "production"
+
+  # ─────────────────────────────────────────────────────────────
+  # Service A — Pendaftaran Pasien (Patient Registration)
+  # Hanya connect ke postgres-a, rabbitmq, dan service-b (gRPC)
+  # ─────────────────────────────────────────────────────────────
+  service-a:
+    build:
+      context: ./service-a
+      dockerfile: Dockerfile
+      args:
+        BUILD_ENV: production
+    
+    image: medisync-service-a:latest
+    container_name: medisync-service-a
+    restart: unless-stopped
+    
+    environment:
+      PORT: "4001"
+      ENV: production
+      LOG_LEVEL: info
+      DB_HOST: postgres-a
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: db_pendaftaran
+      DB_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-a:5432/db_pendaftaran?sslmode=disable"
+      RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/"
+      GRPC_SERVICE_B: "service-b:50052"
+    
+    ports:
+      - "0.0.0.0:8003:4001"  # REST API (external)
+    
+    depends_on:
+      postgres-a:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      service-b:
+        condition: service_healthy
+    
+    networks:
+      - medisync-net
+    
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://localhost:4001/health
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        labels: "medisync.service=service-a"
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    labels:
+      com.medisync.service: "service-a"
+      com.medisync.component: "patient-registration"
+      com.medisync.env: "production"
+
+  # ─────────────────────────────────────────────────────────────
+  # Frontend — React Application
+  # ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BUILD_ENV: production
+        VITE_SERVICE_A_URL: "http://${VPS_IP}:8003"
+
+    image: medisync-frontend:latest
+    container_name: medisync-frontend
+    restart: unless-stopped
+
+    environment:
+      NODE_ENV: production
+    
+    ports:
+      - "0.0.0.0:3002:80"  # Frontend (external)
+    
+    depends_on:
+      service-a:
+        condition: service_healthy
+    
+    networks:
+      - medisync-net
+    
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://localhost:80/
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "15m"
+        max-file: "3"
+        labels: "medisync.service=frontend"
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    labels:
+      com.medisync.service: "frontend"
+      com.medisync.component: "ui"
+      com.medisync.env: "production"

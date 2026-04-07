@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import PatientForm from "./components/PatientForm";
 import PatientList from "./components/PatientList";
+import RecordList from "./components/RecordList";
 import { IconTerminal, IconDatabase, IconLink, IconMessage, IconBox } from "./components/icons";
 
 const SERVICE_A_URL = import.meta.env.VITE_SERVICE_A_URL || "http://localhost:4001";
@@ -88,22 +89,29 @@ export default function App() {
 
           {/* Segmented Control */}
           <div style={styles.segmentedWrap}>
-            <div style={styles.segmented}>
+            <div style={{ ...styles.segmented, width: "100%" }}>
               <div style={{
                 ...styles.segmentIndicator,
-                left: activeTab === "form" ? "3px" : "calc(50% + 1px)",
+                width: "calc(33.33% - 2px)",
+                left: activeTab === "form" ? "3px" : activeTab === "list" ? "calc(33.33% + 1px)" : "calc(66.66% + 1px)",
               }} />
               <button
-                style={{ ...styles.segment, ...(activeTab === "form" ? styles.segmentActive : {}) }}
+                style={{ ...styles.segment, flex: 1, ...(activeTab === "form" ? styles.segmentActive : {}) }}
                 onClick={() => setActiveTab("form")}
               >
                 + Daftar Pasien Baru
               </button>
               <button
-                style={{ ...styles.segment, ...(activeTab === "list" ? styles.segmentActive : {}) }}
+                style={{ ...styles.segment, flex: 1, ...(activeTab === "list" ? styles.segmentActive : {}) }}
                 onClick={() => { setActiveTab("list"); fetchPatients(); }}
               >
                 Daftar Pasien ({patients.length})
+              </button>
+              <button
+                style={{ ...styles.segment, flex: 1, ...(activeTab === "records" ? styles.segmentActive : {}) }}
+                onClick={() => setActiveTab("records")}
+              >
+                Rekam Medis
               </button>
             </div>
           </div>
@@ -117,8 +125,10 @@ export default function App() {
                 loading={loading}
                 setLoading={setLoading}
               />
-            ) : (
+            ) : activeTab === "list" ? (
               <PatientList patients={patients} onRefresh={fetchPatients} />
+            ) : (
+              <RecordList patients={patients} />
             )}
           </div>
         </div>
@@ -178,7 +188,7 @@ const styles = {
 
   main: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 16px" },
   window: {
-    width: "100%", maxWidth: "820px",
+    width: "100%", maxWidth: "960px",
     background: "rgba(245,246,250,0.82)",
     backdropFilter: "blur(60px) saturate(180%) brightness(1.05)",
     WebkitBackdropFilter: "blur(60px) saturate(180%) brightness(1.05)",
