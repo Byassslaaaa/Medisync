@@ -51,7 +51,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: db_pendaftaran
-      POSTGRES_INITDB_ARGS: "-c max_connections=50 -c shared_buffers=256MB"
     
     volumes:
       - pgdata-a:/var/lib/postgresql/data
@@ -103,7 +102,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: db_rekam_medis
-      POSTGRES_INITDB_ARGS: "-c max_connections=50 -c shared_buffers=256MB"
     
     volumes:
       - pgdata-b:/var/lib/postgresql/data
