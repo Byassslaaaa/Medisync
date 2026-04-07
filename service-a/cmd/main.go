@@ -32,10 +32,9 @@ func main() {
 
 	// CORS middleware — izinkan request dari Frontend (localhost:3000)
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost"},
-		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
-		AllowCredentials: true,
+		AllowAllOrigins: true,
+		AllowMethods:    []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders:    []string{"Origin", "Content-Type", "Accept"},
 	}))
 
 	// Health check
