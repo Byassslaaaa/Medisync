@@ -3,6 +3,8 @@ package handler
 import (
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"hospital/service-a/internal/db"
@@ -30,9 +32,16 @@ type PatientResponse struct {
 	RegisteredAt string `json:"registered_at"`
 }
 
+func isGrpcBypassEnabled() bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv("BYPASS_GRPC_CHECK_ON_FAILURE")))
+	return value == "1" || value == "true" || value == "yes" || value == "on"
+}
+
 // RegisterPatient menangani POST /api/patients
 // Alur: validasi → cek gRPC → simpan DB → publish MQ → return response
 func RegisterPatient(c *gin.Context) {
+	bypassGrpcOnFailure := isGrpcBypassEnabled()
+
 	var req RegisterPatientRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -46,17 +55,21 @@ func RegisterPatient(c *gin.Context) {
 
 	// ─── STEP 1: gRPC ke Service B — cek rekam medis (SYNCHRONOUS) ───
 	log.Printf("[Service-A][Handler] → Mengecek rekam medis via gRPC untuk NIK: %s", req.NIK)
-	hasRecord, _, err := grpcclient.CheckPatientRecord(req.NIK)
-	if err != nil {
-		log.Printf("[Service-A][Handler] ✗ gRPC error: %v", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"success": false,
-			"message": "Service rekam medis tidak tersedia. Coba lagi.",
-		})
-		return
+	hasRecord, _, grpcErr := grpcclient.CheckPatientRecord(req.NIK)
+	if grpcErr != nil {
+		if !bypassGrpcOnFailure {
+			log.Printf("[Service-A][Handler] ✗ gRPC error: %v", grpcErr)
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"success": false,
+				"message": "Service rekam medis tidak tersedia. Coba lagi.",
+			})
+			return
+		}
+
+		log.Printf("[Service-A][Handler] ⚠ gRPC error, bypass aktif. Lanjut simpan data + publish MQ. Error: %v", grpcErr)
 	}
 
-	if hasRecord {
+	if grpcErr == nil && hasRecord {
 		log.Printf("[Service-A][Handler] Pasien dengan NIK %s sudah terdaftar.", req.NIK)
 		c.JSON(http.StatusConflict, gin.H{
 			"success": false,
@@ -74,11 +87,11 @@ func RegisterPatient(c *gin.Context) {
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at
 	`
-	err = db.DB.QueryRow(query, req.Name, req.NIK, req.TanggalLahir, req.NoTelepon).
+	dbErr := db.DB.QueryRow(query, req.Name, req.NIK, req.TanggalLahir, req.NoTelepon).
 		Scan(&patientID, &registeredAt)
 
-	if err != nil {
-		log.Printf("[Service-A][Handler] ✗ Gagal INSERT ke DB: %v", err)
+	if dbErr != nil {
+		log.Printf("[Service-A][Handler] ✗ Gagal INSERT ke DB: %v", dbErr)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "Gagal menyimpan data pasien.",
@@ -107,8 +120,7 @@ func RegisterPatient(c *gin.Context) {
 	}()
 
 	// ─── STEP 4: Return response ke Frontend ───
-	log.Printf("[Service-A][Handler] ✓ Pendaftaran selesai. Returning response ke Frontend.")
-	c.JSON(http.StatusCreated, gin.H{
+	response := gin.H{
 		"success": true,
 		"message": "Pasien berhasil didaftarkan.",
 		"data": PatientResponse{
@@ -119,7 +131,14 @@ func RegisterPatient(c *gin.Context) {
 			NoTelepon:    req.NoTelepon,
 			RegisteredAt: registeredAt.Format(time.RFC3339),
 		},
-	})
+	}
+
+	if grpcErr != nil && bypassGrpcOnFailure {
+		response["warning"] = "Service rekam medis sedang tidak tersedia. Data tetap disimpan dan akan diproses async saat service kembali normal."
+	}
+
+	log.Printf("[Service-A][Handler] ✓ Pendaftaran selesai. Returning response ke Frontend.")
+	c.JSON(http.StatusCreated, response)
 }
 
 // GetAllPatients menangani GET /api/patients

@@ -288,6 +288,7 @@ services:
       PORT: "4001"
       ENV: production
       LOG_LEVEL: info
+      BYPASS_GRPC_CHECK_ON_FAILURE: ${BYPASS_GRPC_CHECK_ON_FAILURE:-false}
       DB_HOST: postgres-a
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
@@ -304,8 +305,6 @@ services:
       postgres-a:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      service-b:
         condition: service_healthy
     
     networks:

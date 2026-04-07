@@ -65,6 +65,14 @@ PROMPT_ADD_MEDICAL_RECORDS.md
 PROMPT_ADD_MEDICAL_RECORDS.docx
 CONVERT_TO_WORD_GUIDE.md
 RINGKASAN_DEPLOYMENT_LENGKAP.md
+DEPLOYMENT_PANDUAN_LENGKAP.md
+DEPLOYMENT_PRESENTASI_RINGKAS.md
+DEPLOYMENT_PRESENTASI.docx
+generate_deployment_word.py
+generate_deployment_word_v2.py
+docs/architecture.drawio
+docs/sequence_diagram.drawio
+docs/.$*.drawio.bkp
 
 # ─── Docker local volumes ─────────────────────────────────────────
 **/.docker/
