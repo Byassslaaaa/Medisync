@@ -52,6 +52,7 @@ PROMPT_VIBECODE_LAPORAN_WORD.md
 generate_docs.py
 generate_pptx.py
 generate_penjelasan.py
+generate_deployment_doc.py
 *.pdf
 PENJELASAN_MEDISYNC.docx
 DEPLOYMENT.md

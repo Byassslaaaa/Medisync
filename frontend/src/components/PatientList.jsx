@@ -53,13 +53,14 @@ export default function PatientList({ patients, onRefresh }) {
                 <td style={{ ...s.td, color: 'rgba(15,15,20,0.40)', width: '40px' }}>{i + 1}</td>
                 <td style={{ ...s.td, fontWeight: 600, color: 'rgba(15,15,20,0.85)' }}>{p.name}</td>
                 <td style={s.td}><code style={s.nikCode}>{p.nik}</code></td>
-                <td style={s.td}>{p.tanggal_lahir}</td>
+                <td style={s.td}>{new Date(p.tanggal_lahir).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                 <td style={{ ...s.td, color: 'rgba(15,15,20,0.55)' }}>{p.no_telepon || '—'}</td>
                 <td style={{ ...s.td, fontSize: '0.80rem', color: 'rgba(15,15,20,0.55)' }}>
                   {new Date(p.registered_at).toLocaleString('id-ID', {
                     day: '2-digit', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit',
-                  })}
+                    timeZone: 'Asia/Jakarta',
+                  })} WIB
                 </td>
                 <td style={s.td}>
                   <span style={s.badge}>
